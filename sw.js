@@ -1,6 +1,6 @@
-// Pangong Lake Marathon - Service Worker v1.0 - 05_11_2026
+// Pangong Lake Marathon - Service Worker v1.1 - 05_11_2026
 // Stale-while-revalidate: opens instantly offline, picks up new versions on the next open.
-const CACHE_NAME = 'pangong-v1.0';
+const CACHE_NAME = 'pangong-v1.1';
 const PREFIX = 'pangong';
 const SHELL = ['./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 const EXTRA = [
