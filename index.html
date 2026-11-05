@@ -1,0 +1,893 @@
+<!-- Pangong Lake Marathon v1.0 - 05_11_2026 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Pangong Lake Marathon</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14181C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pangong Expenses">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#14181C; --surface:#1E242A; --surface-alt:#262E35; --surface-raised:#2C343C;
+    --border:#333D45; --text:#ECEEF0; --text-dim:#9AA5AD; --text-faint:#6B7680;
+    --ahling:#E8A33D; --ahling-soft:#3A2E18; --gautam:#4FA3A0; --gautam-soft:#17302E;
+    --kitty:#C77DFF; --kitty-soft:#2C2138; --danger:#E5645F; --danger-soft:#3A2422;
+    --success:#6FBF8B; --radius:14px; --radius-sm:9px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:var(--font); }
+  body{ min-height:100dvh; overscroll-behavior-y:none; }
+  button{ font-family:inherit; touch-action:manipulation; }
+  input,select,textarea{ font-family:inherit; touch-action:manipulation; }
+  .hidden{ display:none !important; }
+
+  #gate, #setup{ min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; }
+  .gate-logo{ width:72px; height:72px; margin-bottom:18px; }
+  #gate h1, #setup h1{ font-size:22px; margin:0 0 4px; }
+  #gate p, #setup p{ color:var(--text-dim); font-size:14px; margin:0 0 20px; max-width:340px; }
+  .gate-buttons{ display:flex; flex-direction:column; gap:14px; width:100%; max-width:320px; }
+  .gate-btn{ border:1.5px solid var(--border); background:var(--surface); color:var(--text);
+    padding:20px 18px; border-radius:var(--radius); font-size:18px; font-weight:600;
+    display:flex; align-items:center; justify-content:space-between; }
+  .gate-btn .swatch{ width:14px; height:14px; border-radius:4px; }
+  .gate-btn[data-person="Ahling"] .swatch{ background:var(--ahling); }
+  .gate-btn[data-person="Gautam"] .swatch{ background:var(--gautam); }
+  .gate-btn:active{ background:var(--surface-alt); }
+  .gate-foot{ margin-top:22px; font-size:12px; color:var(--text-faint); max-width:320px; }
+  .setup-box{ background:var(--danger-soft); border:1px solid var(--danger); border-radius:var(--radius-sm); padding:14px; font-size:13.5px; color:#ffb3af; max-width:340px; }
+
+  #app{ min-height:100dvh; display:flex; flex-direction:column; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  header.topbar{ position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--border);
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
+  .brand svg{ width:24px; height:24px; flex-shrink:0; }
+  .brand-text{ font-weight:700; font-size:14px; letter-spacing:0.2px; }
+  .brand-sub{ font-size:10.5px; color:var(--text-faint); font-family:var(--mono); }
+  .top-right{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+  .whoami{ display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border);
+    padding:5px 10px 5px 8px; border-radius:20px; font-size:12.5px; font-weight:600; }
+  .whoami .dot{ width:8px; height:8px; border-radius:50%; }
+  .sync{ font-size:10.5px; font-family:var(--mono); color:var(--text-dim); border:1px solid var(--border); border-radius:6px; padding:1px 6px; }
+  .sync.warn{ color:var(--text); border-style:dashed; border-color:var(--text-dim); }
+  .sync.err{ color:#ffb3af; border-color:var(--danger); }
+
+  .summary{ margin:12px 14px 0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
+  .summary-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .summary-label{ font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.6px; }
+  .summary-total{ font-family:var(--mono); font-size:24px; font-weight:700; }
+  .summary-filtered-tag{ font-size:10.5px; color:var(--kitty); font-family:var(--mono); border:1px solid var(--kitty); border-radius:6px; padding:2px 6px; }
+  .summary-people{ display:flex; gap:10px; }
+  .person-card{ flex:1; border-radius:var(--radius-sm); padding:10px; border:1px solid var(--border); }
+  .person-card.ahling{ background:var(--ahling-soft); border-color:#4a3a20; }
+  .person-card.gautam{ background:var(--gautam-soft); border-color:#1f3837; }
+  .person-card-name{ font-size:11.5px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:5px; }
+  .person-card-name .dot{ width:7px; height:7px; border-radius:50%; }
+  .person-card .paid{ font-size:10.5px; color:var(--text-dim); font-family:var(--mono); }
+  .person-card .net{ font-family:var(--mono); font-size:14px; font-weight:700; margin-top:3px; }
+  .net.pos{ color:var(--success); } .net.neg{ color:var(--danger); } .net.zero{ color:var(--text-dim); }
+  .settle-line{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); font-size:12.5px; text-align:center; color:var(--text-dim); }
+  .settle-line strong{ color:var(--text); }
+
+  .tabs{ display:flex; gap:6px; margin:12px 14px 0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:4px; }
+  .tab-btn{ flex:1; background:none; border:none; color:var(--text-dim); padding:10px 4px; border-radius:9px; font-size:13px; font-weight:600; }
+  .tab-btn.active{ background:var(--surface-raised); color:var(--text); }
+
+  .chip-row{ display:flex; gap:7px; overflow-x:auto; padding:10px 14px 2px; scrollbar-width:none; }
+  .chip-row::-webkit-scrollbar{ display:none; }
+  .chip{ flex:0 0 auto; background:var(--surface); border:1.5px solid var(--border); color:var(--text-dim);
+    padding:10px 15px; border-radius:20px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+  .chip.selected{ background:var(--text); color:var(--bg); border-color:var(--text); }
+  .chip.selected::before{ content:"\2713 "; }
+  .chip[data-kind="person"].selected[data-person="Ahling"]{ background:var(--ahling); border-color:var(--ahling); color:#221a0d; }
+  .chip[data-kind="person"].selected[data-person="Gautam"]{ background:var(--gautam); border-color:var(--gautam); color:#0c1e1c; }
+
+  #expenseList{ padding:10px 14px 20px; display:flex; flex-direction:column; gap:9px; }
+  .expense-card{ display:flex; width:100%; text-align:left; align-items:center; gap:11px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; color:var(--text); }
+  .exp-cat-badge{ min-width:42px; height:38px; padding:0 4px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:800; font-family:var(--mono); flex-shrink:0; }
+  .exp-mid{ flex:1; min-width:0; }
+  .exp-cat{ font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; }
+  .exp-desc{ font-size:14.5px; font-weight:600; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .exp-meta{ font-size:11.5px; color:var(--text-dim); margin-top:3px; font-family:var(--mono); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .tag-mini{ border:1px solid var(--border); border-radius:5px; padding:1px 5px; font-size:10px; }
+  .tag-mini.kitty{ color:var(--kitty); border-color:var(--kitty); }
+  .exp-right{ text-align:right; flex-shrink:0; }
+  .exp-amount{ font-family:var(--mono); font-weight:700; font-size:15px; }
+  .exp-orig{ font-size:10.5px; color:var(--text-faint); font-family:var(--mono); }
+  .empty-state{ text-align:center; padding:50px 20px; color:var(--text-faint); }
+  .empty-state p{ font-size:13.5px; margin:4px 0; }
+
+  .panel{ margin:12px 14px; }
+  .panel-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+  .panel-card h2{ font-size:14px; margin:0 0 12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; }
+  .settle-hero{ text-align:center; padding:18px 10px; }
+  .settle-hero .big{ font-family:var(--mono); font-size:22px; font-weight:800; margin:8px 0 4px; }
+  .settle-hero .sub{ font-size:13px; color:var(--text-dim); }
+  .settle-hero .icon-wrap{ width:52px; height:52px; margin:0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .breakdown-row{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .breakdown-row:last-child{ border-bottom:none; }
+  .breakdown-row .val{ font-family:var(--mono); font-weight:600; }
+
+  .kitty-gauge{ height:14px; border-radius:8px; background:var(--surface-alt); overflow:hidden; border:1px solid var(--border); margin:10px 0 6px; }
+  .kitty-gauge-fill{ height:100%; background:var(--kitty); }
+  .kitty-gauge-fill.low{ background:var(--danger); }
+  .kitty-numbers{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-dim); font-family:var(--mono); }
+  .kitty-warning{ margin-top:10px; background:var(--danger-soft); border:1px solid var(--danger); color:#ffb3af;
+    border-radius:var(--radius-sm); padding:10px 12px; font-size:12.5px; }
+  .topup-row{ display:flex; width:100%; justify-content:space-between; align-items:center; padding:12px 0; background:none; border:none; border-bottom:1px solid var(--border); color:inherit; font-size:13px; text-align:left; }
+  .topup-row:last-child{ border-bottom:none; }
+  .topup-who{ font-weight:700; }
+  .topup-amt{ font-family:var(--mono); }
+  .btn-secondary{ width:100%; margin-top:14px; background:var(--surface-raised); border:1px solid var(--border); color:var(--text);
+    padding:14px; border-radius:var(--radius-sm); font-size:13.5px; font-weight:700; }
+
+  .fab-bar{ position:fixed; left:0; right:0; bottom:0; z-index:30; background:var(--bg); border-top:1px solid var(--border);
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:10px; }
+  .fab-add{ flex:1; background:var(--text); color:var(--bg); border:none; border-radius:var(--radius-sm);
+    padding:15px; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .fab-add:active{ opacity:0.85; }
+  .fab-export{ background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:var(--radius-sm);
+    padding:15px 16px; display:flex; align-items:center; justify-content:center; }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:50; display:flex; align-items:flex-end; }
+  .modal-sheet{ background:var(--bg); width:100%; max-height:92dvh; overflow-y:auto; border-radius:20px 20px 0 0;
+    border:1px solid var(--border); border-bottom:none; padding:18px 18px calc(24px + env(safe-area-inset-bottom)); }
+  .modal-handle{ width:38px; height:4px; background:var(--border); border-radius:3px; margin:0 auto 14px; }
+  .modal-title{ font-size:17px; font-weight:800; margin:0 0 16px; }
+  .field{ margin-bottom:15px; }
+  .field label{ display:block; font-size:11.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+  .field input[type=text], .field input[type=number], .field input[type=date], .field select, .field textarea{
+    width:100%; background:var(--surface); border:1.5px solid var(--border); color:var(--text);
+    padding:12px; border-radius:var(--radius-sm); font-size:16px; }
+  .field textarea{ min-height:60px; resize:vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus{ outline:none; border-color:var(--kitty); }
+  .row2{ display:flex; gap:10px; }
+  .row2 > .field{ flex:1; min-width:0; }
+  .amt-row{ display:flex; gap:8px; }
+  .amt-row input[type=number]{ flex:1.4; }
+  .amt-row select{ flex:0.9; }
+  .rate-hint{ font-size:11px; color:var(--text-faint); margin-top:5px; font-family:var(--mono); }
+  .rate-hint input{ width:90px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:4px 6px; font-family:var(--mono); font-size:14px; }
+  .seg{ display:flex; border:1.5px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+  .seg button{ flex:1; background:var(--surface); border:none; color:var(--text-dim); padding:13px 6px; font-size:13.5px; font-weight:700; border-right:1px solid var(--border); }
+  .seg button:last-child{ border-right:none; }
+  .seg button.active{ background:var(--surface-raised); color:var(--text); }
+  .seg button.active::before{ content:"\2713 "; }
+  .seg button[data-val="Ahling"].active{ background:var(--ahling); color:#221a0d; }
+  .seg button[data-val="Gautam"].active{ background:var(--gautam); color:#0c1e1c; }
+  .seg button[data-val="kitty"].active{ background:var(--kitty); color:#221030; }
+  .custom-split{ display:flex; gap:10px; margin-top:10px; }
+  .custom-split .field{ flex:1; margin-bottom:0; }
+  .modal-actions{ display:flex; gap:10px; margin-top:6px; }
+  .btn-save{ flex:1; background:var(--text); color:var(--bg); border:none; padding:15px; border-radius:var(--radius-sm); font-size:15px; font-weight:800; }
+  .btn-cancel{ background:var(--surface); border:1px solid var(--border); color:var(--text-dim); padding:15px 18px; border-radius:var(--radius-sm); font-size:14px; font-weight:700; }
+  .btn-delete{ width:100%; margin-top:10px; background:var(--danger-soft); border:1px solid var(--danger); color:#ffb3af; padding:13px; border-radius:var(--radius-sm); font-size:13.5px; font-weight:700; }
+  .split-info{ font-size:12px; color:var(--text-dim); background:var(--surface-alt); border-radius:var(--radius-sm); padding:10px 11px; margin-top:8px; }
+
+  .confirm-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:60; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .confirm-box{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; max-width:320px; width:100%; text-align:center; }
+  .confirm-box p{ font-size:14.5px; margin:0 0 18px; color:var(--text); }
+  .confirm-actions{ display:flex; gap:10px; }
+  .confirm-actions button{ flex:1; padding:13px; border-radius:var(--radius-sm); font-size:14px; font-weight:700; border:1px solid var(--border); }
+  .confirm-actions .confirm-yes{ background:var(--danger); border-color:var(--danger); color:#fff; }
+  .confirm-actions .confirm-no{ background:var(--surface-raised); color:var(--text); }
+
+  #toast{ position:fixed; left:50%; bottom:100px; transform:translateX(-50%); z-index:80;
+    background:var(--text); color:var(--bg); padding:11px 18px; border-radius:24px; font-size:13.5px; font-weight:700;
+    opacity:0; pointer-events:none; }
+  #toast.show{ opacity:1; }
+
+  @media (min-width:640px){
+    #app{ max-width:520px; margin:0 auto; }
+    header.topbar, .modal-backdrop{ max-width:520px; margin:0 auto; }
+  }
+</style>
+</head>
+<body>
+
+<div id="setup" class="hidden">
+  <h1>Setup needed</h1>
+  <p id="setupMsg"></p>
+  <div class="setup-box">See the deployment guide, Part A, for the Firebase setup steps.</div>
+</div>
+
+<div id="gate" class="hidden">
+  <svg class="gate-logo" viewBox="0 0 100 100" fill="none"><rect width="100" height="100" rx="20" fill="#1E242A"/><polygon points="8,62 38,26 62,62" fill="#6B7680"/><polygon points="40,62 70,32 94,62" fill="#9AA5AD"/><circle cx="78" cy="22" r="7" fill="#E8A33D"/><rect x="8" y="62" width="86" height="26" rx="4" fill="#3C8DBC"/><path d="M16 72h24M52 72h30M24 80h30M62 80h22" stroke="#ECEEF0" stroke-width="2.5" stroke-linecap="round"/></svg>
+  <h1>Pangong Lake Marathon</h1>
+  <p>Leh &amp; Pangong Lake &#183; Feb 18-28, 2027</p>
+  <div class="gate-buttons">
+    <button class="gate-btn" data-person="Ahling"><span>Ahling</span><span class="swatch"></span></button>
+    <button class="gate-btn" data-person="Gautam"><span>Gautam</span><span class="swatch"></span></button>
+  </div>
+  <p class="gate-foot">Pick who you are. This choice is locked to this phone. Entries sync live between both phones.</p>
+</div>
+
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 100 100" fill="none"><rect width="100" height="100" rx="20" fill="#1E242A"/><polygon points="8,62 38,26 62,62" fill="#6B7680"/><polygon points="40,62 70,32 94,62" fill="#9AA5AD"/><circle cx="78" cy="22" r="7" fill="#E8A33D"/><rect x="8" y="62" width="86" height="26" rx="4" fill="#3C8DBC"/><path d="M16 72h24M52 72h30M24 80h30M62 80h22" stroke="#ECEEF0" stroke-width="2.5" stroke-linecap="round"/></svg>
+      <div>
+        <div class="brand-text">Pangong Lake Marathon</div>
+        <div class="brand-sub">18-28 FEB 2027</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <div class="whoami"><span class="dot" id="whoamiDot"></span><span id="whoamiName">--</span></div>
+      <div class="sync" id="syncBadge">Connecting...</div>
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="summary-top">
+      <div>
+        <div class="summary-label">Total trip spend</div>
+        <div class="summary-total" id="totalSpend">&#8377;0</div>
+      </div>
+      <div id="filteredTag" class="summary-filtered-tag hidden">Filtered total</div>
+    </div>
+    <div class="summary-people">
+      <div class="person-card ahling">
+        <div class="person-card-name"><span class="dot" style="background:var(--ahling)"></span>Ahling</div>
+        <div class="paid" id="ahlingPaid">Paid &#8377;0</div>
+        <div class="net" id="ahlingNet">--</div>
+      </div>
+      <div class="person-card gautam">
+        <div class="person-card-name"><span class="dot" style="background:var(--gautam)"></span>Gautam</div>
+        <div class="paid" id="gautamPaid">Paid &#8377;0</div>
+        <div class="net" id="gautamNet">--</div>
+      </div>
+    </div>
+    <div class="settle-line" id="settleLine">All settled</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="expenses">Expenses</button>
+    <button class="tab-btn" data-tab="settlement">Settlement</button>
+    <button class="tab-btn" data-tab="kitty">Kitty</button>
+  </div>
+
+  <div id="tab-expenses">
+    <div class="chip-row" id="categoryChips"></div>
+    <div class="chip-row" id="personChips"></div>
+    <div id="expenseList"></div>
+  </div>
+
+  <div id="tab-settlement" class="hidden panel">
+    <div class="panel-card">
+      <h2>Settlement</h2>
+      <div class="settle-hero">
+        <div class="icon-wrap" id="settleIconWrap">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" id="settleIcon"></svg>
+        </div>
+        <div class="big" id="settleBig">All settled</div>
+        <div class="sub">Reimbursements + kitty top-ups combined. Always covers the full trip, ignoring filters.</div>
+      </div>
+      <div class="breakdown-row"><span>Ahling paid (total)</span><span class="val" id="brAhlingPaid">&#8377;0</span></div>
+      <div class="breakdown-row"><span>Gautam paid (total)</span><span class="val" id="brGautamPaid">&#8377;0</span></div>
+      <div class="breakdown-row"><span>Ahling net balance</span><span class="val" id="brAhlingNet">&#8377;0</span></div>
+      <div class="breakdown-row"><span>Gautam net balance</span><span class="val" id="brGautamNet">&#8377;0</span></div>
+    </div>
+  </div>
+
+  <div id="tab-kitty" class="hidden panel">
+    <div class="panel-card">
+      <h2>Kitty pool</h2>
+      <div class="kitty-numbers"><span>Contributed</span><span id="kittyContributed">&#8377;0</span></div>
+      <div class="kitty-gauge"><div class="kitty-gauge-fill" id="kittyGaugeFill" style="width:0%"></div></div>
+      <div class="kitty-numbers"><span>Drawn: <span id="kittyDrawn">&#8377;0</span></span><span>Balance: <strong id="kittyBalance">&#8377;0</strong></span></div>
+      <div id="kittyWarning" class="kitty-warning hidden">WARNING: Kitty balance is low. Top up before the next shared expenses.</div>
+      <button class="btn-secondary" id="addTopupBtn">+ Add kitty top-up</button>
+    </div>
+    <div class="panel-card" style="margin-top:12px;">
+      <h2>Top-up history</h2>
+      <div id="topupList"></div>
+    </div>
+  </div>
+
+  <div class="fab-bar">
+    <button class="fab-add" id="fabAdd">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+      Add expense
+    </button>
+    <button class="fab-export" id="fabExport" aria-label="Export to xlsx">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ CONFIG (edit only the FIREBASE_CONFIG values) ============ */
+var FIREBASE_CONFIG = {
+  apiKey: "PASTE_API_KEY_HERE",
+  authDomain: "PASTE_AUTH_DOMAIN_HERE",
+  projectId: "PASTE_PROJECT_ID_HERE",
+  storageBucket: "PASTE_STORAGE_BUCKET_HERE",
+  messagingSenderId: "PASTE_MESSAGING_SENDER_ID_HERE",
+  appId: "PASTE_APP_ID_HERE"
+};
+var TRIP_ID = "pangong-lake";
+var APP_PREFIX = "pangong";
+var EXPORT_NAME = "Pangong_Lake_Marathon_Expenses";
+
+/* ============ CONSTANTS ============ */
+var PEOPLE = ["Ahling","Gautam"];
+var PEOPLE_COLOR = { Ahling: "#E8A33D", Gautam: "#4FA3A0" };
+var CATEGORIES = ["Airfare (PNQ-LEH-PNQ)", "Food (B+L+D+S)", "Hotel (LEH)", "Incidentals", "Shopping", "Permits", "Tips (LOCAL)", "Travel (LOCAL)", "Travel Insurance", "Entry Fee"];
+var CAT_SHORT = {"Airfare (PNQ-LEH-PNQ)": "AIR", "Food (B+L+D+S)": "FOOD", "Hotel (LEH)": "HOTEL", "Incidentals": "INCD", "Shopping": "SHOP", "Permits": "PRMT", "Tips (LOCAL)": "TIPS", "Travel (LOCAL)": "TRVL", "Travel Insurance": "INS", "Entry Fee": "ENTRY"};
+var CURRENCIES = ["INR"];
+var MULTI = CURRENCIES.length > 1;
+var DEFAULT_RATES = {"INR": 1};
+var LS_IDENTITY = APP_PREFIX + "_identity";
+var LS_RATES = APP_PREFIX + "_last_rates";
+
+/* ============ STATE ============ */
+var state = {
+  identity: null, expenses: [], topups: [], loaded: false,
+  lastRates: Object.assign({}, DEFAULT_RATES),
+  activeCategory: "All", activePerson: "All", activeTab: "expenses",
+  pendingExp: false, pendingTop: false, syncError: false
+};
+var expCol = null, topCol = null;
+
+function loadLocal(){
+  try{
+    var id = localStorage.getItem(LS_IDENTITY);
+    if(id === "Ahling" || id === "Gautam") state.identity = id;
+    var rt = localStorage.getItem(LS_RATES);
+    if(rt) state.lastRates = Object.assign({}, DEFAULT_RATES, JSON.parse(rt));
+  }catch(e){ console.error(e); }
+}
+function saveRates(){ try{ localStorage.setItem(LS_RATES, JSON.stringify(state.lastRates)); }catch(e){} }
+
+/* ============ FIREBASE ============ */
+function showSetup(msg){
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("setupMsg").textContent = msg;
+  document.getElementById("setup").classList.remove("hidden");
+}
+function initFirebase(){
+  if(typeof firebase === "undefined"){
+    showSetup("The sync library could not load. Open the app once while you have internet, then try again.");
+    return false;
+  }
+  if(String(FIREBASE_CONFIG.apiKey).indexOf("PASTE") === 0){
+    showSetup("Firebase is not configured yet. The six Firebase values still need to be filled in.");
+    return false;
+  }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    var db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs: true }).catch(function(e){ console.warn("Persistence off:", e && e.code); });
+    expCol = db.collection("trips").doc(TRIP_ID).collection("expenses");
+    topCol = db.collection("trips").doc(TRIP_ID).collection("topups");
+  }catch(e){
+    console.error(e);
+    showSetup("Firebase could not start. Check the six config values.");
+    return false;
+  }
+  return true;
+}
+function startListeners(){
+  expCol.onSnapshot({ includeMetadataChanges: true }, function(snap){
+    state.expenses = snap.docs.map(function(d){ return d.data(); });
+    state.pendingExp = snap.docs.some(function(d){ return d.metadata.hasPendingWrites; });
+    state.loaded = true; state.syncError = false;
+    renderAll();
+  }, function(err){ console.error(err); state.syncError = true; updateSyncBadge(); });
+  topCol.onSnapshot({ includeMetadataChanges: true }, function(snap){
+    state.topups = snap.docs.map(function(d){ return d.data(); });
+    state.pendingTop = snap.docs.some(function(d){ return d.metadata.hasPendingWrites; });
+    renderAll();
+  }, function(err){ console.error(err); state.syncError = true; updateSyncBadge(); });
+}
+function updateSyncBadge(){
+  var el = document.getElementById("syncBadge");
+  var pending = state.pendingExp || state.pendingTop;
+  var online = navigator.onLine !== false;
+  el.classList.remove("warn","err");
+  if(state.syncError){ el.textContent = "Sync error"; el.classList.add("err"); }
+  else if(pending && online){ el.textContent = "Syncing..."; el.classList.add("warn"); }
+  else if(!online){ el.textContent = pending ? "Offline - saved on phone" : "Offline"; el.classList.add("warn"); }
+  else if(!state.loaded){ el.textContent = "Connecting..."; el.classList.add("warn"); }
+  else { el.textContent = "Synced"; }
+}
+window.addEventListener("online", updateSyncBadge);
+window.addEventListener("offline", updateSyncBadge);
+
+function writeExpense(rec){ expCol.doc(rec.id).set(rec).catch(function(e){ console.error(e); toast("Save failed - check connection"); }); }
+function removeExpense(id){ expCol.doc(id).delete().catch(function(e){ console.error(e); }); }
+function writeTopup(rec){ topCol.doc(rec.id).set(rec).catch(function(e){ console.error(e); toast("Save failed - check connection"); }); }
+function removeTopup(id){ topCol.doc(id).delete().catch(function(e){ console.error(e); }); }
+
+/* ============ HELPERS ============ */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function fmtINR(n){
+  var v = Math.round(n), neg = v < 0; v = Math.abs(v);
+  var s = v.toString(), last3 = s.slice(-3), rest = s.slice(0,-3);
+  if(rest !== "") last3 = "," + last3;
+  return (neg ? "-" : "") + "\u20B9" + rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + last3;
+}
+function todayStr(){
+  var d = new Date();
+  var m = ("0" + (d.getMonth()+1)).slice(-2), day = ("0" + d.getDate()).slice(-2);
+  return d.getFullYear() + "-" + m + "-" + day;
+}
+function toast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._h);
+  toast._h = setTimeout(function(){ t.classList.remove("show"); }, 1800);
+}
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function setActive(container, btn){
+  container.querySelectorAll("button").forEach(function(b){ b.classList.remove("active"); });
+  btn.classList.add("active");
+}
+
+/* ============ BALANCE ENGINE ============ */
+function computeShares(amt, splitType, ahlingPct){
+  if(splitType === "custom" && typeof ahlingPct === "number"){
+    var a = amt * (ahlingPct/100);
+    return { Ahling: a, Gautam: amt - a };
+  }
+  return { Ahling: amt/2, Gautam: amt/2 };
+}
+function computeBalances(expenseList, topupList){
+  var balance = { Ahling: 0, Gautam: 0 }, paidTotal = { Ahling: 0, Gautam: 0 };
+  expenseList.forEach(function(e){
+    paidTotal[e.paidBy] = (paidTotal[e.paidBy]||0) + e.amountINR;
+    if(e.participants === "both" && e.funding === "reimburse"){
+      var sh = computeShares(e.amountINR, e.splitType, e.customAhlingPct);
+      var other = e.paidBy === "Ahling" ? "Gautam" : "Ahling";
+      balance[e.paidBy] += sh[other]; balance[other] -= sh[other];
+    }
+  });
+  topupList.forEach(function(t){
+    var sh = computeShares(t.amountINR, t.splitType, t.customAhlingPct);
+    var other = t.contributedBy === "Ahling" ? "Gautam" : "Ahling";
+    balance[t.contributedBy] += sh[other]; balance[other] -= sh[other];
+  });
+  return { balance: balance, paidTotal: paidTotal };
+}
+function computeKitty(){
+  var contributed = state.topups.reduce(function(s,t){ return s + t.amountINR; }, 0);
+  var drawn = state.expenses.filter(function(e){ return e.funding === "kitty" && e.participants === "both"; })
+    .reduce(function(s,e){ return s + e.amountINR; }, 0);
+  return { contributed: contributed, drawn: drawn, balance: contributed - drawn };
+}
+
+/* ============ RENDER ============ */
+function renderChips(){
+  var catRow = document.getElementById("categoryChips"), perRow = document.getElementById("personChips");
+  var cs = catRow.scrollLeft, ps = perRow.scrollLeft;
+  catRow.innerHTML = ["All"].concat(CATEGORIES).map(function(c){
+    var sel = state.activeCategory === c ? "selected" : "";
+    return '<button class="chip '+sel+'" data-kind="category" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c === "All" ? "All" : CAT_SHORT[c])+'</button>';
+  }).join("");
+  perRow.innerHTML = ["All"].concat(PEOPLE).map(function(p){
+    var sel = state.activePerson === p ? "selected" : "";
+    return '<button class="chip '+sel+'" data-kind="person" data-person="'+escapeHtml(p)+'">'+escapeHtml(p === "All" ? "All payers" : "Paid: "+p)+'</button>';
+  }).join("");
+  catRow.scrollLeft = cs; perRow.scrollLeft = ps;
+  catRow.querySelectorAll(".chip").forEach(function(b){ b.addEventListener("click", function(){ state.activeCategory = b.getAttribute("data-cat"); renderAll(); }); });
+  perRow.querySelectorAll(".chip").forEach(function(b){ b.addEventListener("click", function(){ state.activePerson = b.getAttribute("data-person"); renderAll(); }); });
+}
+function getFilteredExpenses(){
+  return state.expenses.filter(function(e){
+    return (state.activeCategory === "All" || e.category === state.activeCategory) &&
+           (state.activePerson === "All" || e.paidBy === state.activePerson);
+  }).sort(function(a,b){ return b.date.localeCompare(a.date) || (b.createdAt - a.createdAt); });
+}
+function renderExpenseList(){
+  var el = document.getElementById("expenseList");
+  if(!state.loaded){ el.innerHTML = '<div class="empty-state"><p>Loading...</p></div>'; return; }
+  var list = getFilteredExpenses();
+  if(list.length === 0){
+    el.innerHTML = '<div class="empty-state"><p>No expenses match this filter.</p><p>Tap "Add expense" to log one.</p></div>';
+    return;
+  }
+  el.innerHTML = list.map(function(e){
+    var bg = e.paidBy === "Ahling" ? "var(--ahling-soft)" : "var(--gautam-soft)";
+    var fg = e.paidBy === "Ahling" ? "var(--ahling)" : "var(--gautam)";
+    var orig = (e.currency && e.currency !== "INR") ? '<div class="exp-orig">'+escapeHtml(e.currency)+' '+e.amountOriginal+' @ '+e.rate+'</div>' : "";
+    var part = e.participants === "both" ? "Both" : e.paidBy + " only";
+    var fund = e.participants === "both" ? (e.funding === "kitty" ? '<span class="tag-mini kitty">KITTY</span>' : '<span class="tag-mini">REIMB</span>') : '<span class="tag-mini">PERSONAL</span>';
+    return '<button class="expense-card" data-id="'+escapeHtml(e.id)+'">'+
+      '<div class="exp-cat-badge" style="background:'+bg+';color:'+fg+'">'+escapeHtml(CAT_SHORT[e.category]||"?")+'</div>'+
+      '<div class="exp-mid"><div class="exp-cat">'+escapeHtml(e.category)+'</div>'+
+      '<div class="exp-desc">'+escapeHtml(e.description || "(no description)")+'</div>'+
+      '<div class="exp-meta"><span>'+escapeHtml(e.date)+'</span><span>&#183;</span><span>Paid: '+escapeHtml(e.paidBy)+'</span><span>&#183;</span><span>'+escapeHtml(part)+'</span>'+fund+'</div></div>'+
+      '<div class="exp-right"><div class="exp-amount">'+fmtINR(e.amountINR)+'</div>'+orig+'</div></button>';
+  }).join("");
+  el.querySelectorAll(".expense-card").forEach(function(c){ c.addEventListener("click", function(){ openExpenseModal(c.getAttribute("data-id")); }); });
+}
+function setNet(id, val){
+  var el = document.getElementById(id), r = Math.round(val);
+  el.classList.remove("pos","neg","zero");
+  if(Math.abs(r) < 1){ el.textContent = "Settled"; el.classList.add("zero"); }
+  else if(r > 0){ el.textContent = "Owed " + fmtINR(r); el.classList.add("pos"); }
+  else { el.textContent = "Owes " + fmtINR(Math.abs(r)); el.classList.add("neg"); }
+}
+function renderSummary(){
+  var filtered = getFilteredExpenses();
+  var isF = state.activeCategory !== "All" || state.activePerson !== "All";
+  document.getElementById("filteredTag").classList.toggle("hidden", !isF);
+  var all = state.expenses.reduce(function(s,e){ return s + e.amountINR; }, 0);
+  var shown = filtered.reduce(function(s,e){ return s + e.amountINR; }, 0);
+  document.getElementById("totalSpend").textContent = fmtINR(isF ? shown : all);
+  var full = computeBalances(state.expenses, state.topups);
+  document.getElementById("ahlingPaid").textContent = "Paid " + fmtINR(full.paidTotal.Ahling||0);
+  document.getElementById("gautamPaid").textContent = "Paid " + fmtINR(full.paidTotal.Gautam||0);
+  setNet("ahlingNet", full.balance.Ahling); setNet("gautamNet", full.balance.Gautam);
+  var diff = Math.round(full.balance.Ahling), line = document.getElementById("settleLine");
+  if(Math.abs(diff) < 1) line.textContent = "All settled";
+  else if(diff > 0) line.innerHTML = "<strong>Gautam owes Ahling "+fmtINR(diff)+"</strong>";
+  else line.innerHTML = "<strong>Ahling owes Gautam "+fmtINR(Math.abs(diff))+"</strong>";
+}
+function renderSettlement(){
+  var full = computeBalances(state.expenses, state.topups), diff = Math.round(full.balance.Ahling);
+  var big = document.getElementById("settleBig"), wrap = document.getElementById("settleIconWrap"), icon = document.getElementById("settleIcon");
+  if(Math.abs(diff) < 1){
+    big.textContent = "All settled"; wrap.style.background = "var(--surface-alt)";
+    icon.innerHTML = '<path d="M5 13l4 4L19 7" stroke="#6FBF8B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+  } else if(diff > 0){
+    big.textContent = "Gautam pays Ahling " + fmtINR(diff); wrap.style.background = "var(--gautam-soft)";
+    icon.innerHTML = '<path d="M4 12h16m0 0-5-5m5 5-5 5" stroke="#4FA3A0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  } else {
+    big.textContent = "Ahling pays Gautam " + fmtINR(Math.abs(diff)); wrap.style.background = "var(--ahling-soft)";
+    icon.innerHTML = '<path d="M20 12H4m0 0 5-5m-5 5 5 5" stroke="#E8A33D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  document.getElementById("brAhlingPaid").textContent = fmtINR(full.paidTotal.Ahling||0);
+  document.getElementById("brGautamPaid").textContent = fmtINR(full.paidTotal.Gautam||0);
+  document.getElementById("brAhlingNet").textContent = (full.balance.Ahling>=0?"+":"") + fmtINR(full.balance.Ahling);
+  document.getElementById("brGautamNet").textContent = (full.balance.Gautam>=0?"+":"") + fmtINR(full.balance.Gautam);
+}
+function renderKitty(){
+  var k = computeKitty();
+  document.getElementById("kittyContributed").textContent = fmtINR(k.contributed);
+  document.getElementById("kittyDrawn").textContent = fmtINR(k.drawn);
+  document.getElementById("kittyBalance").textContent = fmtINR(k.balance);
+  var pct = k.contributed > 0 ? Math.max(0, Math.min(100, (k.balance/k.contributed)*100)) : 0;
+  var fill = document.getElementById("kittyGaugeFill");
+  fill.style.width = pct + "%";
+  var low = k.contributed > 0 && (k.balance/k.contributed) < 0.15;
+  fill.classList.toggle("low", low);
+  document.getElementById("kittyWarning").classList.toggle("hidden", !low);
+  var list = state.topups.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || (b.createdAt - a.createdAt); });
+  var el = document.getElementById("topupList");
+  if(list.length === 0){ el.innerHTML = '<div class="empty-state"><p>No top-ups logged yet.</p></div>'; return; }
+  el.innerHTML = list.map(function(t){
+    return '<button class="topup-row" data-id="'+escapeHtml(t.id)+'"><span><span class="topup-who">'+escapeHtml(t.contributedBy)+'</span> &#183; '+escapeHtml(t.date)+'</span><span class="topup-amt">'+fmtINR(t.amountINR)+'</span></button>';
+  }).join("");
+  el.querySelectorAll(".topup-row").forEach(function(r){ r.addEventListener("click", function(){ openTopupModal(r.getAttribute("data-id")); }); });
+}
+function renderAll(){
+  renderChips(); renderExpenseList(); renderSummary(); renderSettlement(); renderKitty(); updateSyncBadge();
+}
+
+/* ============ TABS ============ */
+document.querySelectorAll(".tab-btn").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+    btn.classList.add("active");
+    var tab = btn.getAttribute("data-tab");
+    ["expenses","settlement","kitty"].forEach(function(t){ document.getElementById("tab-"+t).classList.toggle("hidden", t !== tab); });
+  });
+});
+
+/* ============ CONFIRM ============ */
+function showConfirm(msg, onYes, yesLabel){
+  var b = document.createElement("div");
+  b.className = "confirm-backdrop";
+  b.innerHTML = '<div class="confirm-box"><p>'+escapeHtml(msg)+'</p><div class="confirm-actions"><button class="confirm-no">Cancel</button><button class="confirm-yes">'+escapeHtml(yesLabel||"Delete")+'</button></div></div>';
+  document.body.appendChild(b);
+  b.querySelector(".confirm-no").addEventListener("click", function(){ b.remove(); });
+  b.querySelector(".confirm-yes").addEventListener("click", function(){ b.remove(); onYes(); });
+  b.addEventListener("click", function(e){ if(e.target === b) b.remove(); });
+}
+
+/* ============ SHARED FORM PIECES ============ */
+function currencyControl(idPrefix, cur){
+  if(!MULTI) return '<input type="hidden" id="'+idPrefix+'-currency" value="INR">';
+  return '<select id="'+idPrefix+'-currency">'+CURRENCIES.map(function(c){ return '<option value="'+c+'"'+(c===cur?" selected":"")+'>'+c+'</option>'; }).join("")+'</select>';
+}
+function wireKeyboard(root){
+  root.querySelectorAll("input, textarea, select").forEach(function(inp){
+    inp.addEventListener("focus", function(){ setTimeout(function(){ inp.scrollIntoView({block:"center", behavior:"smooth"}); }, 300); });
+  });
+}
+function readRate(prefix, currency){
+  if(currency === "INR") return 1;
+  var r = document.getElementById(prefix+"-rate");
+  return r ? (parseFloat(r.value)||0) : 0;
+}
+
+/* ============ EXPENSE MODAL ============ */
+function openExpenseModal(id){
+  var editing = !!id;
+  var e = editing ? state.expenses.find(function(x){ return x.id === id; }) : null;
+  if(editing && !e){ toast("That expense was removed"); return; }
+  var d = Object.assign({
+    date: todayStr(), category: CATEGORIES[0], currency: "INR", amountOriginal: "", rate: 1,
+    paidBy: state.identity, participants: "both", splitType: "equal", customAhlingPct: 50,
+    funding: "reimburse", description: "", notes: ""
+  }, editing ? e : {});
+
+  var b = document.createElement("div");
+  b.className = "modal-backdrop";
+  b.innerHTML =
+    '<div class="modal-sheet"><div class="modal-handle"></div>'+
+    '<div class="modal-title">'+(editing?"Edit expense":"Add expense")+'</div>'+
+    '<div class="row2">'+
+      '<div class="field"><label>Date</label><input type="date" id="f-date" value="'+escapeHtml(d.date)+'"></div>'+
+      '<div class="field"><label>Category</label><select id="f-category">'+CATEGORIES.map(function(c){ return '<option value="'+escapeHtml(c)+'"'+(c===d.category?" selected":"")+'>'+escapeHtml(c)+'</option>'; }).join("")+'</select></div>'+
+    '</div>'+
+    '<div class="field"><label>Amount'+(MULTI?"":" (INR)")+'</label><div class="amt-row">'+
+      '<input type="number" id="f-amount" inputmode="decimal" placeholder="0" value="'+escapeHtml(d.amountOriginal)+'" step="0.01" min="0">'+
+      currencyControl("f", d.currency)+'</div><div class="rate-hint" id="rateHint"></div></div>'+
+    '<div class="field"><label>Paid by</label><div class="seg" id="f-paidby">'+PEOPLE.map(function(p){ return '<button type="button" data-val="'+p+'" class="'+(p===d.paidBy?"active":"")+'">'+p+'</button>'; }).join("")+'</div></div>'+
+    '<div class="field"><label>Applies to</label><div class="seg" id="f-participants">'+
+      ['both','Ahling','Gautam'].map(function(v){ var lbl = v==="both"?"Both":v+" only"; return '<button type="button" data-val="'+v+'" class="'+(d.participants===v?"active":"")+'">'+lbl+'</button>'; }).join("")+'</div></div>'+
+    '<div id="sharedWrap"></div>'+
+    '<div class="field"><label>Description</label><input type="text" id="f-desc" placeholder="What was it for?" value="'+escapeHtml(d.description)+'"></div>'+
+    '<div class="field"><label>Notes (optional)</label><textarea id="f-notes" placeholder="Anything else worth remembering">'+escapeHtml(d.notes)+'</textarea></div>'+
+    '<div class="modal-actions"><button type="button" class="btn-cancel" id="cancelBtn">Cancel</button><button type="button" class="btn-save" id="saveBtn">'+(editing?"Save changes":"Save expense")+'</button></div>'+
+    (editing ? '<button type="button" class="btn-delete" id="deleteBtn">Delete this expense</button>' : '')+
+    '</div>';
+  document.body.appendChild(b);
+  var q = function(s){ return b.querySelector(s); };
+
+  function rateHint(){
+    if(!MULTI) return;
+    var cur = q("#f-currency").value, w = q("#rateHint");
+    if(cur === "INR"){ w.innerHTML = ""; return; }
+    var rate = d.currency === cur && d.rate ? d.rate : (state.lastRates[cur] || DEFAULT_RATES[cur]);
+    w.innerHTML = 'Rate to INR: <input type="number" id="f-rate" step="0.0001" min="0" value="'+rate+'"> <span id="rateResult"></span>';
+    q("#f-rate").addEventListener("input", rateResult); rateResult();
+  }
+  function rateResult(){
+    var amt = parseFloat(q("#f-amount").value)||0, r = q("#f-rate");
+    var w = q("#rateResult"); if(w) w.textContent = "= " + fmtINR(amt * (r ? (parseFloat(r.value)||0) : 1));
+  }
+  function sharedFields(){
+    var part = q("#f-participants .active").getAttribute("data-val"), w = q("#sharedWrap");
+    if(part !== "both"){ w.innerHTML = ""; return; }
+    w.innerHTML =
+      '<div class="field"><label>Funding</label><div class="seg" id="f-funding">'+
+        '<button type="button" data-val="reimburse" class="'+(d.funding==="reimburse"?"active":"")+'">Reimburse later</button>'+
+        '<button type="button" data-val="kitty" class="'+(d.funding==="kitty"?"active":"")+'">From kitty</button></div></div>'+
+      '<div class="field"><label>Split</label><div class="seg" id="f-splittype">'+
+        '<button type="button" data-val="equal" class="'+(d.splitType==="equal"?"active":"")+'">Equal 50/50</button>'+
+        '<button type="button" data-val="custom" class="'+(d.splitType==="custom"?"active":"")+'">Custom</button></div><div id="customWrap"></div></div>';
+    w.querySelectorAll("#f-funding button").forEach(function(x){ x.addEventListener("click", function(){ setActive(q("#f-funding"), x); }); });
+    w.querySelectorAll("#f-splittype button").forEach(function(x){ x.addEventListener("click", function(){ setActive(q("#f-splittype"), x); customSplit(); }); });
+    customSplit(); wireKeyboard(w);
+  }
+  function customSplit(){
+    var st = q("#f-splittype .active").getAttribute("data-val"), w = q("#customWrap");
+    if(st !== "custom"){ w.innerHTML = ""; return; }
+    w.innerHTML = '<div class="custom-split"><div class="field"><label>Ahling %</label><input type="number" id="f-apct" inputmode="decimal" min="0" max="100" value="'+d.customAhlingPct+'"></div>'+
+      '<div class="field"><label>Gautam %</label><input type="number" id="f-gpct" value="'+(100-d.customAhlingPct)+'" disabled></div></div>'+
+      '<div class="split-info">Gautam % fills in automatically so the total is 100%.</div>';
+    q("#f-apct").addEventListener("input", function(){ var v = Math.max(0, Math.min(100, parseFloat(this.value)||0)); q("#f-gpct").value = (100-v).toFixed(1); });
+    wireKeyboard(w);
+  }
+  q("#f-paidby").querySelectorAll("button").forEach(function(x){ x.addEventListener("click", function(){ setActive(q("#f-paidby"), x); }); });
+  q("#f-participants").querySelectorAll("button").forEach(function(x){ x.addEventListener("click", function(){ setActive(q("#f-participants"), x); sharedFields(); }); });
+  if(MULTI){ q("#f-currency").addEventListener("change", rateHint); q("#f-amount").addEventListener("input", rateResult); }
+  rateHint(); sharedFields(); wireKeyboard(b);
+
+  q("#cancelBtn").addEventListener("click", function(){ b.remove(); });
+  b.addEventListener("click", function(ev){ if(ev.target === b) b.remove(); });
+  q("#saveBtn").addEventListener("click", function(){
+    var amount = parseFloat(q("#f-amount").value);
+    if(!amount || amount <= 0){ toast("Enter a valid amount"); return; }
+    var currency = q("#f-currency").value, rate = readRate("f", currency);
+    if(currency !== "INR" && rate <= 0){ toast("Enter a valid exchange rate"); return; }
+    var part = q("#f-participants .active").getAttribute("data-val");
+    var funding = "reimburse", splitType = "equal", pct = 50;
+    if(part === "both"){
+      funding = q("#f-funding .active").getAttribute("data-val");
+      splitType = q("#f-splittype .active").getAttribute("data-val");
+      if(splitType === "custom"){ var pv = parseFloat(q("#f-apct").value); pct = isNaN(pv) ? 50 : Math.max(0, Math.min(100, pv)); }
+    }
+    var rec = {
+      id: editing ? e.id : uid(), createdAt: editing ? e.createdAt : Date.now(),
+      date: q("#f-date").value || todayStr(), category: q("#f-category").value,
+      amountOriginal: amount, currency: currency, rate: rate, amountINR: amount * rate,
+      paidBy: q("#f-paidby .active").getAttribute("data-val"), participants: part,
+      splitType: splitType, customAhlingPct: pct, funding: funding,
+      description: q("#f-desc").value.trim(), notes: q("#f-notes").value.trim(),
+      updatedBy: state.identity, updatedAt: Date.now()
+    };
+    if(currency !== "INR"){ state.lastRates[currency] = rate; saveRates(); }
+    writeExpense(rec); b.remove(); toast(editing ? "Expense updated" : "Expense saved");
+  });
+  if(editing){
+    q("#deleteBtn").addEventListener("click", function(){
+      showConfirm("Delete this expense? This can't be undone.", function(){ removeExpense(e.id); b.remove(); toast("Expense deleted"); }, "Delete");
+    });
+  }
+}
+
+/* ============ TOP-UP MODAL ============ */
+function openTopupModal(id){
+  var editing = !!id;
+  var t = editing ? state.topups.find(function(x){ return x.id === id; }) : null;
+  if(editing && !t){ toast("That top-up was removed"); return; }
+  var d = Object.assign({
+    date: todayStr(), currency: "INR", amountOriginal: "", rate: 1,
+    contributedBy: state.identity, splitType: "equal", customAhlingPct: 50
+  }, editing ? t : {});
+  var b = document.createElement("div");
+  b.className = "modal-backdrop";
+  b.innerHTML =
+    '<div class="modal-sheet"><div class="modal-handle"></div>'+
+    '<div class="modal-title">'+(editing?"Edit kitty top-up":"Add kitty top-up")+'</div>'+
+    '<div class="field"><label>Date</label><input type="date" id="t-date" value="'+escapeHtml(d.date)+'"></div>'+
+    '<div class="field"><label>Amount'+(MULTI?"":" (INR)")+'</label><div class="amt-row">'+
+      '<input type="number" id="t-amount" inputmode="decimal" placeholder="0" value="'+escapeHtml(d.amountOriginal)+'" step="0.01" min="0">'+
+      currencyControl("t", d.currency)+'</div><div class="rate-hint" id="tRateHint"></div></div>'+
+    '<div class="field"><label>Contributed by</label><div class="seg" id="t-by">'+PEOPLE.map(function(p){ return '<button type="button" data-val="'+p+'" class="'+(p===d.contributedBy?"active":"")+'">'+p+'</button>'; }).join("")+'</div></div>'+
+    '<div class="field"><label>Credited as</label><div class="seg" id="t-split">'+
+      '<button type="button" data-val="equal" class="'+(d.splitType==="equal"?"active":"")+'">Equal 50/50</button>'+
+      '<button type="button" data-val="custom" class="'+(d.splitType==="custom"?"active":"")+'">Custom</button></div><div id="tCustom"></div>'+
+      '<div class="split-info">Decides how much of this top-up counts as covering the other person\'s share, for settlement.</div></div>'+
+    '<div class="modal-actions"><button type="button" class="btn-cancel" id="tCancel">Cancel</button><button type="button" class="btn-save" id="tSave">'+(editing?"Save changes":"Save top-up")+'</button></div>'+
+    (editing ? '<button type="button" class="btn-delete" id="tDelete">Delete this top-up</button>' : '')+'</div>';
+  document.body.appendChild(b);
+  var q = function(s){ return b.querySelector(s); };
+  function rateHint(){
+    if(!MULTI) return;
+    var cur = q("#t-currency").value, w = q("#tRateHint");
+    if(cur === "INR"){ w.innerHTML = ""; return; }
+    var rate = d.currency === cur && d.rate ? d.rate : (state.lastRates[cur] || DEFAULT_RATES[cur]);
+    w.innerHTML = 'Rate to INR: <input type="number" id="t-rate" step="0.0001" min="0" value="'+rate+'">';
+  }
+  function custom(){
+    var st = q("#t-split .active").getAttribute("data-val"), w = q("#tCustom");
+    if(st !== "custom"){ w.innerHTML = ""; return; }
+    w.innerHTML = '<div class="custom-split"><div class="field"><label>Ahling %</label><input type="number" id="t-apct" inputmode="decimal" min="0" max="100" value="'+d.customAhlingPct+'"></div>'+
+      '<div class="field"><label>Gautam %</label><input type="number" id="t-gpct" value="'+(100-d.customAhlingPct)+'" disabled></div></div>';
+    q("#t-apct").addEventListener("input", function(){ var v = Math.max(0, Math.min(100, parseFloat(this.value)||0)); q("#t-gpct").value = (100-v).toFixed(1); });
+    wireKeyboard(w);
+  }
+  q("#t-by").querySelectorAll("button").forEach(function(x){ x.addEventListener("click", function(){ setActive(q("#t-by"), x); }); });
+  q("#t-split").querySelectorAll("button").forEach(function(x){ x.addEventListener("click", function(){ setActive(q("#t-split"), x); custom(); }); });
+  if(MULTI) q("#t-currency").addEventListener("change", rateHint);
+  rateHint(); custom(); wireKeyboard(b);
+  q("#tCancel").addEventListener("click", function(){ b.remove(); });
+  b.addEventListener("click", function(ev){ if(ev.target === b) b.remove(); });
+  q("#tSave").addEventListener("click", function(){
+    var amount = parseFloat(q("#t-amount").value);
+    if(!amount || amount <= 0){ toast("Enter a valid amount"); return; }
+    var currency = q("#t-currency").value, rate = readRate("t", currency);
+    if(currency !== "INR" && rate <= 0){ toast("Enter a valid exchange rate"); return; }
+    var st = q("#t-split .active").getAttribute("data-val"), pct = 50;
+    if(st === "custom"){ var pv = parseFloat(q("#t-apct").value); pct = isNaN(pv) ? 50 : Math.max(0, Math.min(100, pv)); }
+    var rec = {
+      id: editing ? t.id : uid(), createdAt: editing ? t.createdAt : Date.now(),
+      date: q("#t-date").value || todayStr(), contributedBy: q("#t-by .active").getAttribute("data-val"),
+      amountOriginal: amount, currency: currency, rate: rate, amountINR: amount * rate,
+      splitType: st, customAhlingPct: pct, updatedBy: state.identity, updatedAt: Date.now()
+    };
+    if(currency !== "INR"){ state.lastRates[currency] = rate; saveRates(); }
+    writeTopup(rec); b.remove(); toast(editing ? "Top-up updated" : "Top-up saved");
+  });
+  if(editing){
+    q("#tDelete").addEventListener("click", function(){
+      showConfirm("Delete this kitty top-up? This can't be undone.", function(){ removeTopup(t.id); b.remove(); toast("Top-up deleted"); }, "Delete");
+    });
+  }
+}
+
+/* ============ EXPORT ============ */
+function loadSheetJS(cb){
+  if(window.XLSX){ cb(); return; }
+  var s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  s.onload = cb;
+  s.onerror = function(){ toast("Export needs internet - try again when online"); };
+  document.head.appendChild(s);
+}
+function exportXLSX(){
+  loadSheetJS(function(){
+    try{
+      var expRows = state.expenses.slice().sort(function(a,b){ return a.date.localeCompare(b.date); }).map(function(e){
+        var r = {
+          Date: e.date, Category: e.category, Description: e.description, Notes: e.notes,
+          "Paid By": e.paidBy, "Applies To": e.participants === "both" ? "Both" : e.participants,
+          "Split Type": e.participants === "both" ? e.splitType : "-",
+          "Ahling %": e.participants === "both" ? (e.splitType === "custom" ? e.customAhlingPct : 50) : (e.participants === "Ahling" ? 100 : 0),
+          Funding: e.participants === "both" ? e.funding : "personal"
+        };
+        if(MULTI){ r.Currency = e.currency; r["Amount (orig)"] = e.amountOriginal; r["Rate to INR"] = e.rate; }
+        r["Amount (INR)"] = Math.round(e.amountINR);
+        return r;
+      });
+      var topRows = state.topups.slice().sort(function(a,b){ return a.date.localeCompare(b.date); }).map(function(t){
+        var r = { Date: t.date, "Contributed By": t.contributedBy };
+        if(MULTI){ r.Currency = t.currency; r["Amount (orig)"] = t.amountOriginal; r["Rate to INR"] = t.rate; }
+        r["Amount (INR)"] = Math.round(t.amountINR); r["Split Type"] = t.splitType; r["Ahling %"] = t.splitType === "custom" ? t.customAhlingPct : 50;
+        return r;
+      });
+      var full = computeBalances(state.expenses, state.topups), k = computeKitty();
+      var sum = [
+        {Item:"Total trip spend (INR)", Value: Math.round(state.expenses.reduce(function(s,e){ return s+e.amountINR; },0))},
+        {Item:"Ahling total paid (INR)", Value: Math.round(full.paidTotal.Ahling||0)},
+        {Item:"Gautam total paid (INR)", Value: Math.round(full.paidTotal.Gautam||0)},
+        {Item:"Ahling net balance (INR, + = owed to them)", Value: Math.round(full.balance.Ahling)},
+        {Item:"Gautam net balance (INR, + = owed to them)", Value: Math.round(full.balance.Gautam)},
+        {Item:"Kitty contributed (INR)", Value: Math.round(k.contributed)},
+        {Item:"Kitty drawn (INR)", Value: Math.round(k.drawn)},
+        {Item:"Kitty balance remaining (INR)", Value: Math.round(k.balance)}
+      ];
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sum), "Summary");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expRows), "Expenses");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topRows), "Kitty Top-ups");
+      var fname = EXPORT_NAME + "_" + todayStr() + ".xlsx";
+      XLSX.writeFile(wb, fname); toast("Exported " + fname);
+    }catch(err){ console.error(err); toast("Export failed"); }
+  });
+}
+
+/* ============ WIRE UP ============ */
+document.getElementById("fabAdd").addEventListener("click", function(){ openExpenseModal(null); });
+document.getElementById("fabExport").addEventListener("click", exportXLSX);
+document.getElementById("addTopupBtn").addEventListener("click", function(){ openTopupModal(null); });
+
+document.querySelectorAll(".gate-btn").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var p = btn.getAttribute("data-person");
+    showConfirm("Lock this phone to " + p + "? It cannot be changed from inside the app.", function(){
+      state.identity = p;
+      try{ localStorage.setItem(LS_IDENTITY, p); }catch(e){}
+      showApp();
+    }, "Yes, I am " + p);
+  });
+});
+function showApp(){
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  document.getElementById("whoamiName").textContent = state.identity;
+  document.getElementById("whoamiDot").style.background = PEOPLE_COLOR[state.identity];
+  renderAll();
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(e){ console.warn("SW failed", e); }); });
+}
+
+/* ============ INIT ============ */
+loadLocal();
+if(initFirebase()){
+  startListeners();
+  if(state.identity) showApp(); else document.getElementById("gate").classList.remove("hidden");
+}
+
+})();
+</script>
+</body>
+</html>
